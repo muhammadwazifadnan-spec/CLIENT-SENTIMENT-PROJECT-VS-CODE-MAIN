@@ -1,0 +1,597 @@
+{% extends "base.html" %}
+
+{% block title %}Client Sentiment Analysis{% endblock %}
+{% block top_title %}Client Sentiment Analysis{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ===== Upload page layout  ===== */
+.upload-page{
+  max-width: 1100px;
+  margin: 0 auto;
+  display:flex;
+  flex-direction:column;
+  gap: 18px;
+}
+
+.card{
+  background:#fff;
+  border:1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 18px 20px;
+  box-shadow: 0 10px 26px rgba(0,0,0,0.06);
+}
+
+.card-title{
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 800;
+  color:#111827;
+}
+
+.card-subtitle{
+  margin: 0 0 12px;
+  color:#6b7280;
+  font-size: 13px;
+}
+
+.dropbox{
+  border: 2px dashed #d1d5db;
+  border-radius: 14px;
+  padding: 18px;
+  background: #fafafa;
+  text-align:center;
+}
+
+.drop-title{
+  font-weight: 700;
+  color:#111827;
+  margin-bottom: 8px;
+}
+
+.drop-sub{
+  font-size: 12px;
+  color:#6b7280;
+  margin-bottom: 12px;
+}
+
+.row{
+  display:flex;
+  gap: 10px;
+  justify-content:center;
+  flex-wrap:wrap;
+}
+
+.btn-like{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background:#5b5b5b;
+  color:#fff;
+  cursor:pointer;
+  font-size: 13px;
+  user-select:none;
+}
+
+.hint{
+  margin-top: 10px;
+  color:#6b7280;
+  font-size: 12px;
+}
+
+.actions{
+  display:flex;
+  justify-content:flex-end;
+  gap: 12px;
+}
+
+.btn-cancel{
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid #d1d5db;
+  background:#fff;
+  cursor:pointer;
+  font-weight: 700;
+}
+
+/* ===== Schedule Job  ===== */
+.schedule-card{
+  margin-top: 18px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.schedule-card .card-title{
+  padding: 18px 20px 10px;
+}
+
+.schedule-table-wrap{
+  width: 100%;
+  overflow-x: auto;
+  border-top: 1px solid #e5e7eb;
+}
+
+.schedule-table{
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.schedule-table thead th{
+  text-align: left;
+  font-weight: 800;
+  font-size: 13px;
+  padding: 14px 20px;
+  background: #fafafa;
+  border-bottom: 1px solid #e5e7eb;
+  color:#111827;
+}
+
+.schedule-table tbody td{
+  padding: 14px 20px;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 13px;
+  color:#374151;
+}
+
+.status-pill{
+  display:inline-block;
+  padding:6px 10px;
+  border-radius:999px;
+  font-weight:800;
+  font-size:12px;
+}
+
+.status-success{ background:#eaf8ef; color:#1f7a35; }
+.status-running{ background:#fff7ed; color:#9a3412; }
+.status-failed{ background:#fee2e2; color:#991b1b; }
+
+.job-eye{
+  text-decoration:none;
+  font-size:16px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<h1 style="text-align:center; font-size:24px; letter-spacing:0.18em; text-transform:uppercase; margin-bottom:18px; color:#111827;">
+  CLIENT SENTIMENT ANALYSIS
+</h1>
+
+<div class="upload-page">
+
+  <form id="analysisForm"
+        data-show-loading="true"
+        action="/upload_async"
+        method="post"
+        enctype="multipart/form-data">
+
+    <!-- CARD 1: AUDIO -->
+    <section class="card">
+      <h2 class="card-title">Audio Folder Upload</h2>
+      <p class="card-subtitle">Upload one/many .wav files or a folder of .wav files.</p>
+
+      <div class="dropbox">
+        <div class="drop-title">Drag your file(s) to start uploading</div>
+        <div class="drop-sub">OR</div>
+
+        <div class="row">
+          <label class="btn-like">
+            Browse files
+            <input type="file" name="audio_files" multiple accept=".wav" hidden>
+          </label>
+
+          <label class="btn-like">
+            Browse folder
+            <input type="file" name="audio_folder" webkitdirectory directory hidden>
+          </label>
+        </div>
+      </div>
+
+      <div class="hint">Only support .wav files</div>
+    </section>
+
+    <!-- CARD 2: TEXT -->
+    <section class="card">
+      <h2 class="card-title">Text Upload</h2>
+      <p class="card-subtitle">Upload a .pdf / .docx to convert into transcript and analyze.</p>
+
+      <div class="dropbox">
+        <div class="drop-title">Drag your file(s) to start uploading</div>
+        <div class="drop-sub">OR</div>
+
+        <div class="row">
+          <label class="btn-like">
+            Browse files
+            <input type="file" name="doc_files" multiple accept=".pdf,.docx" hidden>
+          </label>
+        </div>
+      </div>
+
+      <div class="hint">Only support .pdf / .docx</div>
+    </section>
+
+    <!-- ACTION BUTTONS -->
+    <div class="actions">
+      <a href="{{ url_for('home') }}" class="btn-cancel">Cancel</a>
+      <!--Upload button removed (auto upload on file select)-->
+    </div>
+
+  </form>
+
+  <!--  Loading box -->
+  <div id="loadingBox" style="display:none; margin-top:10px; font-weight:700; color:#111827;">
+    Processing... Please wait ⏳
+  </div>
+
+  <!--  Schedule Job (INSIDE upload-page) -->
+  <section class="card schedule-card">
+    <h2 class="card-title">Schedule Job</h2>
+
+    <div class="schedule-table-wrap">
+      <table class="schedule-table">
+        <thead>
+          <tr>
+            <th>Job Name</th>
+            <th>Frequency</th>
+            <th>Execution Date</th>
+            <th>Status</th>
+            <th>Details</th>
+          </tr>
+        </thead>
+        <tbody id="scheduleJobBody">
+          <!-- Auto filled by JS -->
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+</div> <!-- ✅ end upload-page -->
+
+<div id="pageData" data-has-results="{{ '1' if results else '0' }}" style="display:none;"></div>
+
+{% if results %}
+  <div id="hiddenResults" style="display:none;">
+    {% for item in results %}
+      <span class="result-name">{{ item.filename }}</span>
+    {% endfor %}
+  </div>
+{% endif %}
+
+<script>
+(function(){
+  const STORAGE_KEY = "schedule_jobs_v1";
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, s => ({
+      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+    }[s]));
+  }
+
+  function loadJobs(){
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); }
+    catch(e){ return []; }
+  }
+
+  function saveJobs(jobs){
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(jobs));
+  }
+
+  function renderJobs(jobs){
+    const tbody = document.getElementById("scheduleJobBody");
+    if (!tbody) return;
+
+    tbody.innerHTML = "";
+
+    if (!jobs.length) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="5" style="padding:16px 20px; color:#6b7280;">
+            No jobs yet. Upload files to create schedule jobs automatically.
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    jobs.forEach(job => {
+      const viewUrl = `/result_pdf?filename=${encodeURIComponent(job.jobName)}`;
+      let statusClass = "status-running";
+      if (job.status === "Success") statusClass = "status-success";
+      if (job.status === "Failed") statusClass = "status-failed";
+
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${escapeHtml(job.jobName)}</td>
+        <td>${escapeHtml(job.frequency)}</td>
+        <td>${escapeHtml(job.executionDate)}</td>
+        <td><span class="status-pill ${statusClass}">${escapeHtml(job.status)}</span></td>
+        <td><a class="job-eye" href="${viewUrl}"target="_blank" title="View result">👁</a></td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function addJobsFromLatestResults(){
+    // If results exist, your template prints result items with .result-name
+    const resultNames = [...document.querySelectorAll(".result-name")]
+      .map(el => (el.textContent || "").trim())
+      .filter(Boolean);
+
+    if (!resultNames.length) return;
+
+    // Use the upload time captured at submit (from base.html)
+    const ts = sessionStorage.getItem("last_upload_ts");
+    const execDate = ts ? new Date(ts).toLocaleString() : new Date().toLocaleString();
+
+    const existing = loadJobs();
+
+    // avoid duplicates: (jobName + executionDate) uniqueness
+    const existingKey = new Set(existing.map(j => `${j.jobName}__${j.executionDate}`));
+
+    const newJobs = resultNames.map(name => ({
+      jobName: name,
+      frequency: detectFrequency(name),
+      executionDate: execDate,
+      status: "Success"
+    })).filter(j => !existingKey.has(`${j.jobName}__${j.executionDate}`));
+
+    if (newJobs.length) {
+      // newest first
+      const merged = [...newJobs.reverse(), ...existing];
+      saveJobs(merged);
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    // 1) If this page load includes results -> record jobs automatically
+    addJobsFromLatestResults();
+
+    // 2) Render table
+    renderJobs(loadJobs());
+  });
+})();
+
+function detectFrequency(fileName){
+  const name = fileName.toLowerCase();
+
+  if(name.includes("30m")) return "Every 30 Minutes";
+  if(name.includes("1h") || name.includes("hour")) return "Every 1 Hour";
+  if(name.includes("daily")) return "Daily";
+  if(name.includes("weekly")) return "Weekly";
+  if(name.includes("monthly")) return "Monthly";
+
+  return "On Upload";
+}
+
+(function(){
+  const STORAGE_KEY = "schedule_jobs_v1";
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, s => ({
+      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+    }[s]));
+  }
+
+  function loadJobs(){
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); }
+    catch(e){ return []; }
+  }
+
+  function saveJobs(jobs){
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(jobs));
+  }
+
+  function renderJobs(jobs){
+    const tbody = document.getElementById("scheduleJobBody");
+    if (!tbody) return;
+
+    tbody.innerHTML = "";
+
+    if (!jobs.length) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="5" style="padding:16px 20px; color:#6b7280;">
+            No jobs yet. Upload files to create schedule jobs automatically.
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    jobs.forEach(job => {
+      const viewUrl = `/result_pdf?filename=${encodeURIComponent(job.jobName)}`;
+      const statusClass = job.status === "Success" ? "status-success" : "status-running";
+
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${escapeHtml(job.jobName)}</td>
+        <td>${escapeHtml(job.frequency)}</td>
+        <td>${escapeHtml(job.executionDate)}</td>
+        <td><span class="status-pill ${statusClass}">${escapeHtml(job.status)}</span></td>
+        <td>
+          ${
+            job.status === "Success"
+              ? `<a class="job-eye" href="${viewUrl}" target="_blank" title="View result">👁</a>`
+              : `<span style="opacity:.35; cursor:not-allowed;">👁</span>`
+          }
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function detectFrequency(fileName){
+    const name = (fileName || "").toLowerCase();
+    if(name.includes("30m")) return "Every 30 Minutes";
+    if(name.includes("1h") || name.includes("hour")) return "Every 1 Hour";
+    if(name.includes("daily")) return "Daily";
+    if(name.includes("weekly")) return "Weekly";
+    if(name.includes("monthly")) return "Monthly";
+    return "On Upload";
+  }
+
+  // ✅ Add "In Progress" jobs immediately (before backend finishes)
+  function addInProgressJobs(fileNames){
+    const execDate = new Date().toLocaleString();
+    const existing = loadJobs();
+
+    // Add newest first
+    const newJobs = fileNames.map(name => ({
+      jobName: name,
+      frequency: detectFrequency(name),
+      executionDate: execDate,
+      status: "In Progress"
+    }));
+
+    const merged = [...newJobs, ...existing];
+    saveJobs(merged);
+    renderJobs(merged);
+    return execDate; // used to update exact rows later
+  }
+
+  function markJobsSuccess(fileNames, execDate){
+  const jobs = loadJobs();
+  const nameSet = new Set(fileNames.map(n => (n || "").toLowerCase()));
+  let changed = false;
+
+  jobs.forEach(j => {
+    if ((j.executionDate === execDate) && nameSet.has((j.jobName || "").toLowerCase())) {
+      j.status = "Success";
+      changed = true;
+    }
+  });
+
+  if (changed) {
+    saveJobs(jobs);
+    renderJobs(jobs);
+  }
+}
+
+  // ✅ Mark jobs from "In Progress" → "Success"
+  function markJobsFailed(fileNames, execDate, reason){
+  const jobs = loadJobs();
+  const nameSet = new Set(fileNames.map(n => (n || "").toLowerCase()));
+  let changed = false;
+
+  jobs.forEach(j => {
+    if ((j.executionDate === execDate) && nameSet.has((j.jobName || "").toLowerCase())) {
+      j.status = "Failed";
+      j.failReason = reason || "Unknown error";
+      changed = true;
+    }
+  });
+
+  if (changed) {
+    saveJobs(jobs);
+    renderJobs(jobs);
+  }
+}
+
+function finishJobSuccess(names, execDate, formEl, loadingBox){
+  markJobsSuccess(names, execDate);
+
+  if (loadingBox) loadingBox.style.display = "none";
+
+  // clear file inputs
+  formEl.querySelectorAll('input[type="file"]').forEach(inp => inp.value = "");
+}
+
+  async function startAsyncUpload(formEl){
+    const loadingBox = document.getElementById("loadingBox");
+    if (loadingBox) loadingBox.style.display = "block";
+
+    const fd = new FormData(formEl);
+
+    // Collect names for schedule table (audio + doc)
+    const names = [];
+    for (const f of (fd.getAll("audio_files") || [])) if (f && f.name) names.push(f.name);
+    for (const f of (fd.getAll("audio_folder") || [])) if (f && f.name) names.push(f.name);
+    for (const f of (fd.getAll("doc_files") || [])) if (f && f.name) names.push(f.name);
+
+    if (!names.length) {
+      if (loadingBox) loadingBox.style.display = "none";
+      return;
+    }
+
+    // Add rows immediately as "In Progress"
+    const execDate = addInProgressJobs(names);
+
+    // Call backend async route
+    const res = await fetch(formEl.action, { method: "POST", body: fd });
+    const data = await res.json();
+
+    if (!data.ok || !data.job_id) {
+      // mark as failed if you want, but you asked only In Progress → Success
+      if (loadingBox) loadingBox.style.display = "none";
+      alert(data.error || "Upload failed");
+      return;
+    }
+
+    // Poll /api/job_status until done
+    const jobId = data.job_id;
+
+    const poll = async () => {
+      try {
+        const r = await fetch(`/api/job_status?job_id=${encodeURIComponent(jobId)}`);
+        const s = await r.json();
+
+        if (s.status === "done") {
+          finishJobSuccess(names, execDate, formEl, loadingBox);
+          return;
+        }
+
+        if (s.status === "error") {
+          markJobsFailed(names, execDate, s.message);
+          if (loadingBox) loadingBox.style.display = "none";
+          alert(s.message || "Analysis failed");
+          return;
+       }
+
+       // faster polling
+       setTimeout(poll, 500);
+
+    } catch(err) {
+      console.error("Polling error:", err);
+      setTimeout(poll, 1000);
+    }
+  };
+
+    poll();
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    // render existing schedule jobs on load
+    renderJobs(loadJobs());
+
+    const form = document.getElementById("analysisForm");
+    if (!form) return;
+
+    // Auto-run when user selects any files
+    const fileInputs = form.querySelectorAll('input[type="file"]');
+    fileInputs.forEach(inp => {
+      inp.addEventListener("change", () => {
+        // start upload immediately
+        startAsyncUpload(form).catch(err => {
+          console.error(err);
+          const loadingBox = document.getElementById("loadingBox");
+          if (loadingBox) loadingBox.style.display = "none";
+          alert("Something went wrong while uploading.");
+        });
+      });
+    });
+  });
+})();
+</script>
+
+{% endblock %}
+
+
+
+
+
+
+
+
